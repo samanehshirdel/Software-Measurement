@@ -33,11 +33,11 @@ Post-release defect density = number of known bugs reported in issue tracker for
 3. CLOC
 
 ### Commands Used To Run the Tools for Collecting Data
-1. Cloc
+1. Cloc - can be downloaded at this  _[link](https://commons.apache.org/proper/commons-collections/)_
 * To find Lines of Code
 ** Cloc projectname>filename.csv -- To collect data in csv file
 * To find relative code churn 
 ** cloc --diff project1 project2>filename.csv
 2. Jira Query
-*project = roject_name AND affectedVersion =version_number and issuetype =bug and  status in (Resolved, Closed) ORDER BY key DESC
+* project = roject_name AND affectedVersion =version_number and issuetype =bug and  status in (Resolved, Closed) ORDER BY key DESC
 
