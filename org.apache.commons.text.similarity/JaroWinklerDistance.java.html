@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../.resources/report.css" type="text/css"/><link rel="shortcut icon" href="../.resources/report.gif" type="image/gif"/><title>JaroWinklerDistance.java</title><link rel="stylesheet" href="../.resources/prettify.css" type="text/css"/><script type="text/javascript" src="../.resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../.sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache Commons Text</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.text.similarity</a> &gt; <span class="el_source">JaroWinklerDistance.java</span></div><h1>JaroWinklerDistance.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.text.similarity;
+
+import java.util.Arrays;
+
+/**
+ * A similarity algorithm indicating the percentage of matched characters between two character sequences.
+ *
+ * &lt;p&gt;
+ * The Jaro measure is the weighted sum of percentage of matched characters
+ * from each file and transposed characters. Winkler increased this measure
+ * for matching initial characters.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * This implementation is based on the Jaro Winkler similarity algorithm
+ * from &lt;a href=&quot;http://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance&quot;&gt;
+ * http://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance&lt;/a&gt;.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * This code has been adapted from Apache Commons Lang 3.3.
+ * &lt;/p&gt;
+ *
+ * @since 1.0
+ */
+<span class="fc" id="L42">public class JaroWinklerDistance implements SimilarityScore&lt;Double&gt; {</span>
+
+    /**
+     * Represents a failed index search.
+     */
+    public static final int INDEX_NOT_FOUND = -1;
+
+    /**
+     * Find the Jaro Winkler Distance which indicates the similarity score
+     * between two CharSequences.
+     *
+     * &lt;pre&gt;
+     * distance.apply(null, null)          = IllegalArgumentException
+     * distance.apply(&quot;&quot;,&quot;&quot;)               = 0.0
+     * distance.apply(&quot;&quot;,&quot;a&quot;)              = 0.0
+     * distance.apply(&quot;aaapppp&quot;, &quot;&quot;)       = 0.0
+     * distance.apply(&quot;frog&quot;, &quot;fog&quot;)       = 0.93
+     * distance.apply(&quot;fly&quot;, &quot;ant&quot;)        = 0.0
+     * distance.apply(&quot;elephant&quot;, &quot;hippo&quot;) = 0.44
+     * distance.apply(&quot;hippo&quot;, &quot;elephant&quot;) = 0.44
+     * distance.apply(&quot;hippo&quot;, &quot;zzzzzzzz&quot;) = 0.0
+     * distance.apply(&quot;hello&quot;, &quot;hallo&quot;)    = 0.88
+     * distance.apply(&quot;ABC Corporation&quot;, &quot;ABC Corp&quot;) = 0.93
+     * distance.apply(&quot;D N H Enterprises Inc&quot;, &quot;D &amp;amp; H Enterprises, Inc.&quot;) = 0.95
+     * distance.apply(&quot;My Gym Children's Fitness Center&quot;, &quot;My Gym. Childrens Fitness&quot;) = 0.92
+     * distance.apply(&quot;PENNSYLVANIA&quot;, &quot;PENNCISYLVNIA&quot;)    = 0.88
+     * &lt;/pre&gt;
+     *
+     * @param left the first String, must not be null
+     * @param right the second String, must not be null
+     * @return result distance
+     * @throws IllegalArgumentException if either String input {@code null}
+     */
+    @Override
+    public Double apply(final CharSequence left, final CharSequence right) {
+<span class="fc" id="L77">        final double defaultScalingFactor = 0.1;</span>
+
+<span class="fc bfc" id="L79" title="All 4 branches covered.">        if (left == null || right == null) {</span>
+<span class="fc" id="L80">            throw new IllegalArgumentException(&quot;Strings must not be null&quot;);</span>
+        }
+
+<span class="fc" id="L83">        final int[] mtp = matches(left, right);</span>
+<span class="fc" id="L84">        final double m = mtp[0];</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (m == 0) {</span>
+<span class="fc" id="L86">            return 0D;</span>
+        }
+<span class="fc" id="L88">        final double j = ((m / left.length() + m / right.length() + (m - mtp[1]) / m)) / 3;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        final double jw = j &lt; 0.7D ? j : j + Math.min(defaultScalingFactor, 1D / mtp[3]) * mtp[2] * (1D - j);</span>
+<span class="fc" id="L90">        return jw;</span>
+    }
+
+    /**
+     * This method returns the Jaro-Winkler string matches, transpositions, prefix, max array.
+     *
+     * @param first the first string to be matched
+     * @param second the second string to be matched
+     * @return mtp array containing: matches, transpositions, prefix, and max length
+     */
+    protected static int[] matches(final CharSequence first, final CharSequence second) {
+        CharSequence max, min;
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (first.length() &gt; second.length()) {</span>
+<span class="fc" id="L103">            max = first;</span>
+<span class="fc" id="L104">            min = second;</span>
+        } else {
+<span class="fc" id="L106">            max = second;</span>
+<span class="fc" id="L107">            min = first;</span>
+        }
+<span class="fc" id="L109">        final int range = Math.max(max.length() / 2 - 1, 0);</span>
+<span class="fc" id="L110">        final int[] matchIndexes = new int[min.length()];</span>
+<span class="fc" id="L111">        Arrays.fill(matchIndexes, -1);</span>
+<span class="fc" id="L112">        final boolean[] matchFlags = new boolean[max.length()];</span>
+<span class="fc" id="L113">        int matches = 0;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (int mi = 0; mi &lt; min.length(); mi++) {</span>
+<span class="fc" id="L115">            final char c1 = min.charAt(mi);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            for (int xi = Math.max(mi - range, 0), xn = Math.min(mi + range + 1, max.length()); xi &lt; xn; xi++) {</span>
+<span class="fc bfc" id="L117" title="All 4 branches covered.">                if (!matchFlags[xi] &amp;&amp; c1 == max.charAt(xi)) {</span>
+<span class="fc" id="L118">                    matchIndexes[mi] = xi;</span>
+<span class="fc" id="L119">                    matchFlags[xi] = true;</span>
+<span class="fc" id="L120">                    matches++;</span>
+<span class="fc" id="L121">                    break;</span>
+                }
+            }
+        }
+<span class="fc" id="L125">        final char[] ms1 = new char[matches];</span>
+<span class="fc" id="L126">        final char[] ms2 = new char[matches];</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int i = 0, si = 0; i &lt; min.length(); i++) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (matchIndexes[i] != -1) {</span>
+<span class="fc" id="L129">                ms1[si] = min.charAt(i);</span>
+<span class="fc" id="L130">                si++;</span>
+            }
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int i = 0, si = 0; i &lt; max.length(); i++) {</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (matchFlags[i]) {</span>
+<span class="fc" id="L135">                ms2[si] = max.charAt(i);</span>
+<span class="fc" id="L136">                si++;</span>
+            }
+        }
+<span class="fc" id="L139">        int transpositions = 0;</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        for (int mi = 0; mi &lt; ms1.length; mi++) {</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (ms1[mi] != ms2[mi]) {</span>
+<span class="fc" id="L142">                transpositions++;</span>
+            }
+        }
+<span class="fc" id="L145">        int prefix = 0;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int mi = 0; mi &lt; min.length(); mi++) {</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (first.charAt(mi) == second.charAt(mi)) {</span>
+<span class="fc" id="L148">                prefix++;</span>
+            } else {
+                break;
+            }
+        }
+<span class="fc" id="L153">        return new int[] {matches, transpositions / 2, prefix, max.length()};</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.eclemma.org/jacoco">JaCoCo</a> 0.7.5.201505241946</span></div></body></html>
